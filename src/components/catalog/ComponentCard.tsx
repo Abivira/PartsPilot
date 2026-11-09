@@ -96,9 +96,10 @@ export function ComponentCard({ part }: ComponentCardProps) {
         setIsAdded(true);
         window.dispatchEvent(
           new CustomEvent("cart-updated", {
-            detail: { count: cartData.itemCount, cart: cartData },
+            detail: { count: cartData.itemCount, itemCount: cartData.itemCount, cart: cartData },
           })
         );
+        window.dispatchEvent(new CustomEvent("open-cart"));
         setTimeout(() => setIsAdded(false), 2000);
       }
     } catch (err) {

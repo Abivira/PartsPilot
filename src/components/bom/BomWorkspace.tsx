@@ -249,8 +249,15 @@ export function BomWorkspace({
         );
         if (typeof window !== "undefined") {
           window.dispatchEvent(
-            new CustomEvent("cart-updated", { detail: data.cart })
+            new CustomEvent("cart-updated", {
+              detail: {
+                count: data.cart?.itemCount,
+                itemCount: data.cart?.itemCount,
+                cart: data.cart,
+              },
+            })
           );
+          window.dispatchEvent(new CustomEvent("open-cart"));
         }
         if (onCartUpdated) onCartUpdated();
         if (onOpenCart) onOpenCart();

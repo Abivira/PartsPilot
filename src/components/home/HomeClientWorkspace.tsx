@@ -58,20 +58,29 @@ export function HomeClientWorkspace({
       });
     };
 
+    const handleOpenCartDirect = () => {
+      setIsCartOpen(true);
+      refreshCart();
+    };
+
     const handleCartUpdated = (e: Event) => {
-      const customEvt = e as CustomEvent<{ count?: number; cart?: CartResponse }>;
-      if (customEvt.detail?.cart) {
-        setCart(customEvt.detail.cart);
+      const customEvt = e as CustomEvent<any>;
+      const newCart =
+        customEvt.detail?.cart || (customEvt.detail?.items ? customEvt.detail : null);
+      if (newCart) {
+        setCart(newCart);
       } else {
         refreshCart();
       }
     };
 
     window.addEventListener("toggle-cart", handleToggleCart);
+    window.addEventListener("open-cart", handleOpenCartDirect);
     window.addEventListener("cart-updated", handleCartUpdated);
 
     return () => {
       window.removeEventListener("toggle-cart", handleToggleCart);
+      window.removeEventListener("open-cart", handleOpenCartDirect);
       window.removeEventListener("cart-updated", handleCartUpdated);
     };
   }, [refreshCart]);

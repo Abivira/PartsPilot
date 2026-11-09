@@ -20,9 +20,13 @@ export function Navbar({ isDbConnected = false }: { isDbConnected?: boolean }) {
 
     // Listen for custom cart update events
     const handleCartUpdated = (e: Event) => {
-      const customEvent = e as CustomEvent<{ count?: number }>;
-      if (customEvent.detail && typeof customEvent.detail.count === "number") {
-        setCartCount(customEvent.detail.count);
+      const customEvent = e as CustomEvent<any>;
+      const count =
+        customEvent.detail?.count ??
+        customEvent.detail?.itemCount ??
+        customEvent.detail?.cart?.itemCount;
+      if (typeof count === "number") {
+        setCartCount(count);
       } else {
         fetch("/api/cart")
           .then((res) => (res.ok ? res.json() : null))
