@@ -118,15 +118,13 @@ export function DiagnosticResultCard({
         )}
       </div>
 
-      {/* Notice Banner */}
-      {notice && (
+      {/* Notice Banner (Only for offline fixtures) */}
+      {notice && !notice.toLowerCase().includes("gemini") && (
         <div className="rounded-xl border border-amber-800/60 bg-amber-950/40 p-4 text-xs text-amber-200 flex items-start gap-2.5">
           <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <span className="font-bold text-white uppercase tracking-wider block">
-              {notice.toLowerCase().includes("gemini")
-                ? "DETERMINISTIC COMPATIBILITY ENGINE ACTIVE"
-                : dataSource === "DEMO_FIXTURE"
+              {dataSource === "DEMO_FIXTURE"
                 ? "OFFLINE DEMONSTRATION MODE — LOCAL FIXTURES"
                 : "SYSTEM NOTICE"}
             </span>
