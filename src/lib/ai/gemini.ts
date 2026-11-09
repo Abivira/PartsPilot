@@ -41,7 +41,7 @@ export async function extractComponentDiagnosis(
   input: ComponentDiagnosticInput
 ): Promise<ExtractedComponentData> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
-  const modelName = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+  const modelName = process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash";
 
   if (!apiKey) {
     throw new Error(
