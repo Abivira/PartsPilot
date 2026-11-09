@@ -293,55 +293,82 @@ export function PayPalCheckoutModal({
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {/* SUCCESS STATE */}
           {step === "SUCCESS" ? (
-            <div className="rounded-2xl border border-emerald-800/60 bg-emerald-950/20 p-6 space-y-5 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-                <CheckCircle2 className="h-8 w-8" />
-              </div>
+            (() => {
+              const isSimulated = confirmedCaptureId?.startsWith("CAP-SANDBOX");
+              return (
+                <div className={`rounded-2xl border p-6 space-y-5 text-center ${
+                  isSimulated
+                    ? "border-amber-600/50 bg-amber-950/20"
+                    : "border-emerald-800/60 bg-emerald-950/20"
+                }`}>
+                  <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full border ${
+                    isSimulated
+                      ? "bg-amber-500/20 text-rcb-gold border-amber-500/40"
+                      : "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                  }`}>
+                    <CheckCircle2 className="h-8 w-8" />
+                  </div>
 
-              <div className="space-y-1">
-                <h4 className="text-lg font-black text-white">
-                  Payment Verified &amp; Inventory Committed!
-                </h4>
-                <p className="text-xs text-obsidian-300">
-                  Your PayPal Sandbox order has been captured server-side. Physical inventory has been decremented in Neon PostgreSQL.
-                </p>
-              </div>
+                  <div className="space-y-1">
+                    <h4 className="text-lg font-black text-white">
+                      {isSimulated ? "Demo Order Processed (Simulation Mode)" : "Payment Verified & Inventory Committed!"}
+                    </h4>
+                    <p className="text-xs text-obsidian-300">
+                      {isSimulated
+                        ? "DEMO MODE — SIMULATED PAYMENT — NO PAYPAL TRANSACTION. Physical inventory lease committed in Neon PostgreSQL."
+                        : "Your PayPal Sandbox order has been captured server-side. Physical inventory has been decremented in Neon PostgreSQL."}
+                    </p>
+                  </div>
 
-              {/* Receipt Snapshot */}
-              <div className="rounded-xl border border-obsidian-800 bg-obsidian-900/80 p-4 text-left space-y-2 text-xs">
-                <div className="flex justify-between border-b border-obsidian-800 pb-2">
-                  <span className="text-obsidian-400">Order Reference:</span>
-                  <span className="font-mono font-bold text-white">
-                    {confirmedOrderNumber || cart?.orderNumber}
-                  </span>
-                </div>
-                <div className="flex justify-between border-b border-obsidian-800 pb-2">
-                  <span className="text-obsidian-400">PayPal Capture ID:</span>
-                  <span className="font-mono text-emerald-400 font-semibold text-[11px] truncate max-w-[200px]">
-                    {confirmedCaptureId}
-                  </span>
-                </div>
-                <div className="flex justify-between border-b border-obsidian-800 pb-2">
-                  <span className="text-obsidian-400">Total Charged:</span>
-                  <span className="font-mono font-bold text-white">
-                    {formatCurrency(confirmedAmountCents ?? totalCents)}
-                  </span>
-                </div>
-                <div className="flex justify-between pt-1">
-                  <span className="text-obsidian-400">Inventory Status:</span>
-                  <span className="text-emerald-400 font-bold">
-                    Stock Committed (Exact-Once)
-                  </span>
-                </div>
-              </div>
+                  {/* Receipt Snapshot */}
+                  <div className="rounded-xl border border-obsidian-800 bg-obsidian-900/80 p-4 text-left space-y-2 text-xs">
+                    <div className="flex justify-between border-b border-obsidian-800 pb-2">
+                      <span className="text-obsidian-400">Payment Type:</span>
+                      <span className={`font-mono font-bold text-[11px] ${
+                        isSimulated ? "text-rcb-gold" : "text-emerald-400"
+                      }`}>
+                        {isSimulated ? "SIMULATED PAYMENT (DEMO)" : "GENUINE PAYPAL ORDERS V2 (SANDBOX)"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-b border-obsidian-800 pb-2">
+                      <span className="text-obsidian-400">Order Reference:</span>
+                      <span className="font-mono font-bold text-white">
+                        {confirmedOrderNumber || cart?.orderNumber}
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-b border-obsidian-800 pb-2">
+                      <span className="text-obsidian-400">
+                        {isSimulated ? "Simulated Capture Ref:" : "PayPal Capture ID:"}
+                      </span>
+                      <span className={`font-mono font-semibold text-[11px] truncate max-w-[200px] ${
+                        isSimulated ? "text-rcb-gold" : "text-emerald-400"
+                      }`}>
+                        {confirmedCaptureId}
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-b border-obsidian-800 pb-2">
+                      <span className="text-obsidian-400">Total {isSimulated ? "Simulated:" : "Charged:"}</span>
+                      <span className="font-mono font-bold text-white">
+                        {formatCurrency(confirmedAmountCents ?? totalCents)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between pt-1">
+                      <span className="text-obsidian-400">Inventory Status:</span>
+                      <span className="text-emerald-400 font-bold">
+                        Stock Committed (Exact-Once)
+                      </span>
+                    </div>
+                  </div>
 
-              <button
-                onClick={handleSuccessDismiss}
-                className="w-full rounded-2xl bg-rcb-red py-3 text-xs font-black uppercase tracking-wider text-white hover:bg-rcb-red-hover transition-colors shadow-md"
-              >
-                Close &amp; Return to Workspace
-              </button>
-            </div>
+                  <button
+                    onClick={handleSuccessDismiss}
+                    className="w-full rounded-2xl bg-rcb-red py-3 text-xs font-black uppercase tracking-wider text-white hover:bg-rcb-red-hover transition-colors shadow-md"
+                  >
+                    Close &amp; Return to Workspace
+                  </button>
+                </div>
+              );
+            })()
           ) : step === "FAILED" ? (
             /* FAILED STATE */
             <div className="rounded-2xl border border-rose-800/60 bg-rose-950/20 p-6 space-y-4 text-center">
@@ -492,18 +519,18 @@ export function PayPalCheckoutModal({
                       type="button"
                       onClick={handleSimulateSandboxCheckout}
                       disabled={step === "CREATING_ORDER" || step === "CAPTURING"}
-                      className="w-full flex items-center justify-center gap-2 rounded-xl border border-rcb-red/50 bg-gradient-to-r from-red-950/40 to-obsidian-900 py-3 px-4 text-xs font-bold text-white hover:border-rcb-red hover:bg-red-950/60 transition-all active:scale-[0.98] shadow-md disabled:opacity-40"
+                      className="w-full flex items-center justify-center gap-2 rounded-xl border border-amber-600/40 bg-gradient-to-r from-amber-950/30 to-obsidian-900 py-3 px-4 text-xs font-bold text-rcb-gold hover:border-rcb-gold hover:bg-amber-950/50 transition-all active:scale-[0.98] shadow-md disabled:opacity-40"
                     >
                       {step === "CREATING_ORDER" || step === "CAPTURING" ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-rcb-red" />
+                        <Loader2 className="h-4 w-4 animate-spin text-rcb-gold" />
                       ) : (
                         <Zap className="h-4 w-4 text-rcb-gold" />
                       )}
-                      <span>Complete Checkout (Server-Authoritative Sandbox Capture)</span>
+                      <span>DEMO MODE — SIMULATED PAYMENT — NO PAYPAL TRANSACTION</span>
                     </button>
                     <div className="text-center pt-1.5">
                       <span className="text-[10px] text-obsidian-400">
-                        ⚡ Real-time Neon PostgreSQL stock reservation &amp; server capture
+                        ⚡ Offline simulation fallback: tests Neon PostgreSQL inventory reservation &amp; commitment
                       </span>
                     </div>
                   </div>
