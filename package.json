@@ -5,12 +5,14 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -H 0.0.0.0",
     "lint": "next lint",
     "test": "vitest run",
     "test:gemini": "tsx scripts/smoke-test-gemini.ts",
+    "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
+    "prisma:deploy": "prisma migrate deploy",
     "seed": "tsx prisma/seed.ts"
   },
   "prisma": {

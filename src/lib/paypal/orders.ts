@@ -40,7 +40,11 @@ export async function createPayPalOrder(
   const subtotalValue = (subtotalCents / 100).toFixed(2);
   const shippingValue = (shippingCents / 100).toFixed(2);
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl =
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.RENDER_EXTERNAL_URL ||
+    "http://localhost:3000";
 
   const payload: PayPalOrderRequest = {
     intent: "CAPTURE",
