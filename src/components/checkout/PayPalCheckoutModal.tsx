@@ -60,6 +60,7 @@ export function PayPalCheckoutModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [confirmedCaptureId, setConfirmedCaptureId] = useState<string | null>(null);
   const [confirmedOrderNumber, setConfirmedOrderNumber] = useState<string | null>(null);
+  const [confirmedAmountCents, setConfirmedAmountCents] = useState<number | null>(null);
   const [activePaypalOrderId, setActivePaypalOrderId] = useState<string | null>(null);
 
   const paypalButtonContainerRef = useRef<HTMLDivElement>(null);
@@ -70,13 +71,16 @@ export function PayPalCheckoutModal({
     if (isOpen) {
       setStep("READY");
       setErrorMessage(null);
+      if (cart?.totalCents) {
+        setConfirmedAmountCents(cart.totalCents);
+      }
     } else {
       hasRenderedRef.current = false;
       if (paypalButtonContainerRef.current) {
         paypalButtonContainerRef.current.innerHTML = "";
       }
     }
-  }, [isOpen]);
+  }, [isOpen, cart?.totalCents]);
 
   // Intercept PayPal SDK dev overlay noise
   useEffect(() => {
@@ -150,6 +154,9 @@ export function PayPalCheckoutModal({
               }
               setConfirmedCaptureId(captureData.captureId);
               setConfirmedOrderNumber(captureData.orderNumber);
+              if (captureData.amountCents) {
+                setConfirmedAmountCents(captureData.amountCents);
+              }
               setStep("SUCCESS");
             } catch (err: unknown) {
               setStep("FAILED");
@@ -228,6 +235,9 @@ export function PayPalCheckoutModal({
 
       setConfirmedCaptureId(captureData.captureId);
       setConfirmedOrderNumber(captureData.orderNumber);
+      if (captureData.amountCents) {
+        setConfirmedAmountCents(captureData.amountCents);
+      }
       setStep("SUCCESS");
     } catch (err: unknown) {
       setStep("FAILED");
@@ -314,7 +324,7 @@ export function PayPalCheckoutModal({
                 <div className="flex justify-between border-b border-obsidian-800 pb-2">
                   <span className="text-obsidian-400">Total Charged:</span>
                   <span className="font-mono font-bold text-white">
-                    {formatCurrency(totalCents)}
+                    {formatCurrency(confirmedAmountCents ?? totalCents)}
                   </span>
                 </div>
                 <div className="flex justify-between pt-1">
