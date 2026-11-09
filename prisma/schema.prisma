@@ -1,0 +1,230 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ---------------------------------------------------------
+// COMPONENT CATALOG
+// ---------------------------------------------------------
+
+enum ComponentCategory {
+  MICROCONTROLLER
+  MOTOR_DRIVER
+  SENSOR
+  MOTOR
+  POWER_MODULE
+  CONNECTOR
+  ACCESSORY
+}
+
+model Part {
+  id                      String            @id @default(cuid())
+  mpn                     String            @unique // Manufacturer Part Number
+  sku                     String            @unique
+  name                    String
+  manufacturer            String
+  category                ComponentCategory
+  description             String
+  imageUrl                String?
+  
+  // Provenance & Engineering Documentation
+  specificationSource     String            // e.g., "Trinamic TMC2209 Datasheet Rev 1.08"
+  specificationVerifiedAt DateTime          // Verification timestamp against documentation
+  datasheetUrl            String?           // Direct link to manufacturer PDF
+  isDemonstrationSample   Boolean           @default(false) // Flags demo assumptions vs verified specs
+  
+  // Pricing in Integer Minor Units (cents) - e.g., $11.50 = 1150
+  priceCents              Int
+  currency                String            @default("USD")
+  
+  // Physical Inventory Tracking
+  stockOnHand             Int               @default(0)
+  stockReserved           Int               @default(0)
+  
+  // Electrical & Physical Specifications (JSONB)
+  specs                   Json
+  
+  // Supported Host Platforms / Ecosystems (e.g., ["Raspberry Pi 4", "Raspberry Pi 5", "Arduino Uno R3"])
+  supportedPlatforms      String[]
+  
+  isActive                Boolean           @default(true)
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  orderItems              OrderItem[]
+  diagnosticMatches       DiagnosticMatch[]
+
+  @@index([category])
+  @@index([mpn])
+}
+
+// ---------------------------------------------------------
+// DIAGNOSTIC AUDIT & MATCHING
+// ---------------------------------------------------------
+
+model DiagnosticSession {
+  id                    String            @id @default(cuid())
+  userPrompt            String?
+  targetHardwareContext Json?
+  imageHash             String?
+  aiRawResponse         Json
+  aiIdentificationScore Float
+  detectedMpn           String?
+  createdAt             DateTime          @default(now())
+
+  matches               DiagnosticMatch[]
+  orders                Order[]
+}
+
+enum CompatibilityTier {
+  VERIFIED
+  POSSIBLE
+  UNVERIFIED
+}
+
+model DiagnosticMatch {
+  id                 String            @id @default(cuid())
+  sessionId          String
+  partId             String
+  tier               CompatibilityTier
+  confidenceScore    Float
+  matchReport        Json
+  
+  session            DiagnosticSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  part               Part              @relation(fields: [partId], references: [id])
+
+  @@index([sessionId])
+  @@index([partId])
+}
+
+// ---------------------------------------------------------
+// ORDERS & GUEST SECURITY
+// ---------------------------------------------------------
+
+enum OrderStatus {
+  DRAFT
+  PENDING_PAYMENT
+  PAID
+  CANCELLED
+  EXPIRED
+  RECONCILIATION_REQUIRED
+}
+
+model Order {
+  id                  String             @id @default(cuid())
+  orderNumber         String             @unique
+  status              OrderStatus        @default(DRAFT)
+  customerEmail       String?
+  customerName        String?
+  shippingAddress     Json?
+  
+  // Guest Security: SHA-256 hash of plaintext token delivered via HttpOnly cookie
+  guestTokenHash      String             @unique
+  
+  // Financial Totals in Integer Minor Units (cents)
+  subtotalCents       Int
+  shippingCents       Int                @default(0)
+  taxCents            Int                @default(0)
+  totalCents          Int
+  currency            String             @default("USD")
+  
+  // Inventory Lease Management & Double-Decrement Guard
+  inventoryLeased     Boolean            @default(false)
+  leaseExpiresAt      DateTime?
+  stockCommitted      Boolean            @default(false) // Prevents dual browser/webhook decrement
+  
+  diagnosticSessionId String?
+  diagnosticSession   DiagnosticSession? @relation(fields: [diagnosticSessionId], references: [id])
+  
+  items               OrderItem[]
+  paymentRecord       PaymentRecord?
+  
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([orderNumber])
+  @@index([customerEmail])
+  @@index([status, leaseExpiresAt])
+}
+
+model OrderItem {
+  id             String   @id @default(cuid())
+  orderId        String
+  partId         String
+  quantity       Int
+  unitPriceCents Int
+  totalCents     Int
+  
+  // Snapshot provenance fields
+  mpn            String?
+  name           String?
+  
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  part           Part     @relation(fields: [partId], references: [id])
+
+  @@index([orderId])
+}
+
+// ---------------------------------------------------------
+// PAYPAL TRANSACTION DOMAIN
+// ---------------------------------------------------------
+
+enum PaymentState {
+  INITIAL
+  ORDER_CREATED
+  CAPTURE_PENDING
+  COMPLETED
+  FAILED
+  RECONCILIATION_REQUIRED
+  CANCELLED
+}
+
+model PaymentRecord {
+  id                    String        @id @default(cuid())
+  orderId               String        @unique
+  paypalOrderId         String?       @unique // Nullable initially before PayPal API responds
+  paypalCaptureId       String?       @unique
+  
+  createIdempotencyKey  String        @unique
+  captureIdempotencyKey String        @unique
+  
+  state                 PaymentState  @default(INITIAL)
+  amountCents           Int
+  currency              String        @default("USD")
+  
+  payerEmail            String?
+  payerId               String?
+  rawCaptureResponse    Json?
+  
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  order                 Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([paypalOrderId])
+  @@index([paypalCaptureId])
+}
+
+model ProcessedWebhook {
+  id            String   @id @default(cuid())
+  paypalEventId String   @unique
+  eventType     String
+  receivedAt    DateTime @default(now())
+}
+
+// ---------------------------------------------------------
+// SERVERLESS-SAFE RATE LIMITING
+// ---------------------------------------------------------
+
+model RateLimitBucket {
+  key       String   @id // SHA-256 hash of client token/IP + route scope (zero raw PII)
+  count     Int      @default(1)
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
