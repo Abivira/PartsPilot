@@ -2,6 +2,9 @@
 
 > **Built for the PayPal AI Hackathon 2026**  
 > *Datasheet-backed compatibility verification, multimodal hardware diagnostics, deterministic bill-of-materials sourcing, and server-authoritative PayPal REST API v2 agentic commerce.*
+> 
+> 🌐 **Live Web Application:** [https://partspilot-zzl1.onrender.com](https://partspilot-zzl1.onrender.com)  
+> 💻 **GitHub Repository:** [https://github.com/Abivira/PartsPilot](https://github.com/Abivira/PartsPilot)
 
 ---
 
