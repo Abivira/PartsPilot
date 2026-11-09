@@ -106,61 +106,105 @@ Please return a structured JSON response with the following JSON fields:
     });
   }
 
-  // Timeout handler: 25 seconds
+  // Timeout handler: 25 seconds per attempt
   const timeoutMs = 25000;
-  let timeoutHandle: NodeJS.Timeout;
 
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutHandle = setTimeout(() => {
-      reject(new Error(`GEMINI_TIMEOUT: Gemini API request timed out after ${timeoutMs}ms.`));
-    }, timeoutMs);
-  });
+  // Candidate models: prefer configured model, then fallback to gemini-3.5-flash and gemini-3.1-flash-lite
+  const candidateModels = Array.from(
+    new Set([modelName, "gemini-3.5-flash", "gemini-3.1-flash-lite"])
+  );
 
-  try {
-    const apiCallPromise = ai.models.generateContent({
-      model: modelName,
-      contents: [
-        {
-          role: "user",
-          parts: promptParts,
-        },
-      ],
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json",
-      },
-    });
+  let lastError: Error | null = null;
 
-    const response = await Promise.race([apiCallPromise, timeoutPromise]);
-    clearTimeout(timeoutHandle!);
+  for (const currentModel of candidateModels) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      let timeoutHandle: NodeJS.Timeout | undefined;
 
-    const rawText = response.text;
-    if (!rawText) {
-      throw new Error("Received empty response from Gemini model.");
-    }
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          reject(new Error(`GEMINI_TIMEOUT: Gemini API request timed out after ${timeoutMs}ms.`));
+        }, timeoutMs);
+      });
 
-    // Parse JSON
-    let parsedJson: unknown;
-    try {
-      parsedJson = JSON.parse(rawText);
-    } catch {
-      // Try to clean markdown fences if any slipped through
-      const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      parsedJson = JSON.parse(cleaned);
-    }
+      try {
+        const apiCallPromise = ai.models.generateContent({
+          model: currentModel,
+          contents: [
+            {
+              role: "user",
+              parts: promptParts,
+            },
+          ],
+          config: {
+            systemInstruction: SYSTEM_INSTRUCTION,
+            responseMimeType: "application/json",
+          },
+        });
 
-    // Validate with Zod
-    return ExtractedComponentDataSchema.parse(parsedJson);
-  } catch (error) {
-    clearTimeout(timeoutHandle!);
+        const response = await Promise.race([apiCallPromise, timeoutPromise]);
+        clearTimeout(timeoutHandle);
 
-    if (error instanceof Error) {
-      // Pass through specific error codes
-      if (error.message.startsWith("GEMINI_API_KEY_NOT_CONFIGURED") || error.message.startsWith("GEMINI_TIMEOUT")) {
-        throw error;
+        const rawText = response.text;
+        if (!rawText) {
+          throw new Error("Received empty response from Gemini model.");
+        }
+
+        // Parse JSON
+        let parsedJson: unknown;
+        try {
+          parsedJson = JSON.parse(rawText);
+        } catch {
+          // Try to clean markdown fences if any slipped through
+          const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+          parsedJson = JSON.parse(cleaned);
+        }
+
+        // Validate with Zod
+        return ExtractedComponentDataSchema.parse(parsedJson);
+      } catch (error) {
+        clearTimeout(timeoutHandle);
+        const err = error instanceof Error ? error : new Error(String(error));
+        lastError = err;
+
+        // Pass through specific error codes immediately
+        if (
+          err.message.startsWith("GEMINI_API_KEY_NOT_CONFIGURED") ||
+          err.message.startsWith("GEMINI_TIMEOUT")
+        ) {
+          throw err;
+        }
+
+        const is503OrRateLimit =
+          err.message.includes("503") ||
+          err.message.includes("high demand") ||
+          err.message.includes("UNAVAILABLE") ||
+          err.message.includes("429") ||
+          err.message.includes("RESOURCE_EXHAUSTED");
+
+        // If it is NOT a transient 503 high demand or 429 rate limit spike, throw formatted error immediately
+        if (!is503OrRateLimit) {
+          throw new Error(`Gemini diagnostic extraction failed: ${err.message}`);
+        }
+
+        if (attempt === 1) {
+          // Brief pause before retry
+          await new Promise((resolve) => setTimeout(resolve, 600));
+          continue;
+        }
+
+        // Exhausted attempts on this model, break to fallback candidate model
+        break;
       }
-      throw new Error(`Gemini diagnostic extraction failed: ${error.message}`);
     }
-    throw new Error("Gemini diagnostic extraction failed due to an unknown provider error.");
   }
+
+  // If all models and retries failed, throw formatted error
+  if (lastError) {
+    if (lastError.message.startsWith("GEMINI_TIMEOUT")) {
+      throw lastError;
+    }
+    throw new Error(`Gemini diagnostic extraction failed: ${lastError.message}`);
+  }
+
+  throw new Error("Gemini diagnostic extraction failed due to an unknown provider error.");
 }
