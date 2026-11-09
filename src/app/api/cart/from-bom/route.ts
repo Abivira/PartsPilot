@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrCreateCart, addBomToCart } from "@/lib/cart/cart-service";
+import { getOrCreateCart, addBomToCart, addItemToCart } from "@/lib/cart/cart-service";
 import { BomEntry } from "@/types/bom";
 
 const COOKIE_NAME = "partspilot_guest_token";
@@ -10,16 +10,38 @@ export async function POST(req: NextRequest) {
     const { guestToken, isNew } = await getOrCreateCart(existingToken);
 
     const body = await req.json();
-    const entries: BomEntry[] = body.entries;
+    const rawList = body.entries || body.items;
 
-    if (!Array.isArray(entries) || entries.length === 0) {
+    if (!Array.isArray(rawList) || rawList.length === 0) {
       return NextResponse.json(
         { error: "Expected non-empty array of BOM entries." },
         { status: 400 }
       );
     }
 
-    const result = await addBomToCart(guestToken, entries);
+    let result;
+    if (Array.isArray(body.entries) && body.entries.length > 0) {
+      result = await addBomToCart(guestToken, body.entries);
+    } else {
+      let addedCount = 0;
+      let skippedCount = 0;
+      for (const item of rawList) {
+        const partId = item.partId || item.matchedPartId;
+        const qty = item.quantity || 1;
+        if (partId) {
+          try {
+            await addItemToCart(guestToken, partId, qty);
+            addedCount++;
+          } catch {
+            skippedCount++;
+          }
+        } else {
+          skippedCount++;
+        }
+      }
+      const cartRes = await getOrCreateCart(guestToken);
+      result = { cart: cartRes.cart, addedCount, skippedCount };
+    }
 
     const res = NextResponse.json(result, { status: 200 });
     if (isNew || !existingToken) {

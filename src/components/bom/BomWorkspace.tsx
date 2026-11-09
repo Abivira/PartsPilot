@@ -236,7 +236,7 @@ export function BomWorkspace({
       const res = await fetch("/api/cart/from-bom", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: sourcedItems }),
+        body: JSON.stringify({ entries: bom.entries, items: sourcedItems }),
       });
 
       const data = await res.json();
@@ -247,6 +247,11 @@ export function BomWorkspace({
         setCartSuccessMessage(
           `Successfully added ${data.addedCount} items to your procurement cart!`
         );
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("cart-updated", { detail: data.cart })
+          );
+        }
         if (onCartUpdated) onCartUpdated();
         if (onOpenCart) onOpenCart();
       }
